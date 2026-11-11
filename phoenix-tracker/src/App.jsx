@@ -6,13 +6,16 @@ import {
   CheckCheck,
   CheckCircle2,
   CircleDashed,
+  Clock3,
   Inbox,
   ListTodo,
   LogOut,
   Pencil,
+  Play,
   Plus,
   Search,
   Settings,
+  Square,
   Trash2,
   X,
 } from 'lucide-react'
@@ -110,6 +113,30 @@ const isTaskOverdue = (task) => {
   return due < today
 }
 
+const formatDuration = (totalMilliseconds) => {
+  const totalSeconds = Math.max(0, Math.floor(totalMilliseconds / 1000))
+  const hours = Math.floor(totalSeconds / 3600)
+  const minutes = Math.floor((totalSeconds % 3600) / 60)
+  const seconds = totalSeconds % 60
+
+  if (hours > 0) {
+    return `${hours}h ${String(minutes).padStart(2, '0')}m ${String(seconds).padStart(2, '0')}s`
+  }
+
+  return `${String(minutes).padStart(2, '0')}m ${String(seconds).padStart(2, '0')}s`
+}
+
+const getTaskElapsedMs = (task, now = Date.now()) => {
+  const baseMs = Number(task.elapsedMs || 0)
+
+  if (!task.timerStartedAt) {
+    return baseMs
+  }
+
+  const startedAt = new Date(task.timerStartedAt).getTime()
+  return baseMs + Math.max(0, now - startedAt)
+}
+
 function App() {
   const [tasks, setTasks] = useState(() => getStoredTasks())
   const [currentUser, setCurrentUser] = useState(() => getStoredUser())
@@ -121,6 +148,15 @@ function App() {
   const [taskForm, setTaskForm] = useState(getDefaultTaskForm(todayKey()))
   const [loginForm, setLoginForm] = useState({ name: '', email: '' })
   const [loginError, setLoginError] = useState('')
+  const [now, setNow] = useState(Date.now())
+
+  useEffect(() => {
+    const intervalId = window.setInterval(() => {
+      setNow(Date.now())
+    }, 1000)
+
+    return () => window.clearInterval(intervalId)
+  }, [])
 
   useEffect(() => {
     localStorage.setItem(STORAGE_KEYS.tasks, JSON.stringify(tasks))
@@ -286,11 +322,71 @@ function App() {
     setTaskForm(getDefaultTaskForm(selectedDate))
   }
 
+  const startTaskTimer = (taskId) => {
+    setTasks((currentTasks) =>
+      currentTasks.map((task) => {
+        if (task.id !== taskId || task.done) {
+          return task
+        }
+
+        return {
+          ...task,
+          timerStartedAt: new Date().toISOString(),
+          timerStoppedAt: null,
+        }
+      }),
+    )
+  }
+
+  const stopTaskTimer = (taskId) => {
+    setTasks((currentTasks) =>
+      currentTasks.map((task) => {
+        if (task.id !== taskId || !task.timerStartedAt) {
+          return task
+        }
+
+        const startedAt = new Date(task.timerStartedAt).getTime()
+        const nextElapsedMs = Number(task.elapsedMs || 0) + (Date.now() - startedAt)
+
+        return {
+          ...task,
+          elapsedMs: nextElapsedMs,
+          timerStartedAt: null,
+          timerStoppedAt: new Date().toISOString(),
+        }
+      }),
+    )
+  }
+
   const toggleTask = (taskId) => {
     setTasks((currentTasks) =>
-      currentTasks.map((task) =>
-        task.id === taskId ? { ...task, done: !task.done } : task,
-      ),
+      currentTasks.map((task) => {
+        if (task.id !== taskId) {
+          return task
+        }
+
+        const nextDone = !task.done
+
+        if (nextDone && task.timerStartedAt) {
+          const startedAt = new Date(task.timerStartedAt).getTime()
+          const nextElapsedMs = Number(task.elapsedMs || 0) + (Date.now() - startedAt)
+
+          return {
+            ...task,
+            done: true,
+            elapsedMs: nextElapsedMs,
+            timerStartedAt: null,
+            timerStoppedAt: new Date().toISOString(),
+          }
+        }
+
+        return {
+          ...task,
+          done: nextDone,
+          timerStartedAt: nextDone ? null : task.timerStartedAt,
+          timerStoppedAt: nextDone ? new Date().toISOString() : task.timerStoppedAt,
+        }
+      }),
     )
   }
 
@@ -562,10 +658,27 @@ function App() {
                             {formatDateLabel(task.dueDate)}
                           </span>
                           <span className='meta-pill muted'>{task.category}</span>
+                          <span className='meta-pill timer-pill'>
+                            <Clock3 size={12} />
+                            {formatDuration(getTaskElapsedMs(task, now))}
+                          </span>
                         </div>
                       </div>
 
                       <div className='task-actions'>
+                        {!task.done && (
+                          task.timerStartedAt ? (
+                            <button type='button' className='timer-button stop' onClick={() => stopTaskTimer(task.id)}>
+                              <Square size={12} />
+                              End
+                            </button>
+                          ) : (
+                            <button type='button' className='timer-button start' onClick={() => startTaskTimer(task.id)}>
+                              <Play size={12} />
+                              Start
+                            </button>
+                          )
+                        )}
                         <button type='button' className='icon-button' onClick={() => openEditModal(task)}>
                           <Pencil size={14} />
                         </button>
