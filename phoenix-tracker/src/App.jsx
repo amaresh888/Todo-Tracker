@@ -143,6 +143,7 @@ function App() {
   const [selectedDate, setSelectedDate] = useState(todayKey())
   const [searchQuery, setSearchQuery] = useState('')
   const [taskFilter, setTaskFilter] = useState('all')
+  const [activeNav, setActiveNav] = useState('My Tasks')
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [editingTaskId, setEditingTaskId] = useState(null)
   const [taskForm, setTaskForm] = useState(getDefaultTaskForm(todayKey()))
@@ -225,14 +226,36 @@ function App() {
     day: 'numeric',
   })
 
-  const totalTasks = currentUserTasks.length
-  const completedTasks = currentUserTasks.filter((task) => task.done).length
-  const pendingTasks = totalTasks - completedTasks
-  const overdueTasks = currentUserTasks.filter((task) => isTaskOverdue(task)).length
+  const totalTasks = selectedDateTasks.length
+  const completedTasks = selectedDateTasks.filter((task) => task.done).length
+  const pendingTasks = selectedDateTasks.filter((task) => !task.done).length
+  const overdueTasks = selectedDateTasks.filter((task) => isTaskOverdue(task)).length
 
   const selectedDayProgress = selectedDateTasks.length
     ? (selectedDateTasks.filter((task) => task.done).length / selectedDateTasks.length) * 100
     : 0
+
+  const handleNavClick = (label) => {
+    setActiveNav(label)
+
+    if (label === 'Today') {
+      setSelectedDate(todayKey())
+      setTaskFilter('all')
+      return
+    }
+
+    if (label === 'Completed') {
+      setTaskFilter('completed')
+      return
+    }
+
+    if (label === 'Upcoming') {
+      setTaskFilter('pending')
+      return
+    }
+
+    setTaskFilter('all')
+  }
 
   const openCreateModal = () => {
     setEditingTaskId(null)
@@ -460,7 +483,12 @@ function App() {
 
           <nav className='sidebar-nav' aria-label='Main navigation'>
             {navItems.map(({ label, icon: Icon }) => (
-              <button key={label} type='button' className={label === 'My Tasks' ? 'nav-item active' : 'nav-item'}>
+              <button
+                key={label}
+                type='button'
+                className={activeNav === label ? 'nav-item active' : 'nav-item'}
+                onClick={() => handleNavClick(label)}
+              >
                 <Icon size={16} />
                 <span>{label}</span>
               </button>
