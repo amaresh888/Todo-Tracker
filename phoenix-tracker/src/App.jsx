@@ -19,12 +19,14 @@ import {
   Trash2,
   X,
 } from 'lucide-react'
+import {
+  STORAGE_KEYS,
+  getStoredTasks,
+  taskMatchesDate,
+  todayKey,
+  toDateKey,
+} from './taskStorage'
 import './App.css'
-
-const STORAGE_KEYS = {
-  tasks: 'phoenix-todos',
-  currentUser: 'phoenix-current-user',
-}
 
 const navItems = [
   { label: 'Overview', icon: Inbox },
@@ -38,49 +40,12 @@ const navItems = [
 const priorityOptions = ['High', 'Medium', 'Low']
 const categoryOptions = ['General', 'Work', 'Personal', 'Study', 'Health']
 
-const todayKey = () => {
-  const date = new Date()
-  const year = date.getFullYear()
-  const month = String(date.getMonth() + 1).padStart(2, '0')
-  const day = String(date.getDate()).padStart(2, '0')
-  return `${year}-${month}-${day}`
-}
-
-const toDateKey = (date) => {
-  const year = date.getFullYear()
-  const month = String(date.getMonth() + 1).padStart(2, '0')
-  const day = String(date.getDate()).padStart(2, '0')
-  return `${year}-${month}-${day}`
-}
-
 const getStoredUser = () => {
   try {
     const saved = localStorage.getItem(STORAGE_KEYS.currentUser)
     return saved ? JSON.parse(saved) : null
   } catch {
     return null
-  }
-}
-
-const getStoredTasks = () => {
-  try {
-    const saved = localStorage.getItem(STORAGE_KEYS.tasks)
-    const parsed = saved ? JSON.parse(saved) : []
-    if (!Array.isArray(parsed)) {
-      return []
-    }
-
-    return parsed.map((task) => ({
-      ...task,
-      title: task.title || task.text || 'Untitled task',
-      description: task.description || '',
-      dueDate: task.dueDate || task.date || todayKey(),
-      priority: task.priority || 'Medium',
-      category: task.category || 'General',
-      date: task.date || task.dueDate || todayKey(),
-    }))
-  } catch {
-    return []
   }
 }
 
@@ -177,7 +142,7 @@ function App() {
   )
 
   const selectedDateTasks = useMemo(
-    () => currentUserTasks.filter((task) => task.date === selectedDate),
+    () => currentUserTasks.filter((task) => taskMatchesDate(task, selectedDate)),
     [currentUserTasks, selectedDate],
   )
 
@@ -420,7 +385,7 @@ function App() {
   const clearCompleted = () => {
     setTasks((currentTasks) =>
       currentTasks.filter(
-        (task) => task.userId !== currentUser.id || task.date !== selectedDate || !task.done,
+        (task) => task.userId !== currentUser.id || !taskMatchesDate(task, selectedDate) || !task.done,
       ),
     )
   }
@@ -623,7 +588,7 @@ function App() {
 
                 {monthlyDays.map((date) => {
                   const key = toDateKey(date)
-                  const dateTasks = currentUserTasks.filter((task) => task.date === key)
+                  const dateTasks = currentUserTasks.filter((task) => taskMatchesDate(task, key))
                   const isSelected = key === selectedDate
                   const isCurrentMonth = date.getMonth() === new Date(`${selectedDate}T00:00:00`).getMonth()
 
